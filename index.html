@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voice Authentication System</title>
+  <style>  
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      text-align: center;
+      margin: 50px;
+    }
+    .container {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      width: 300px;
+      margin: auto;
+    }
+    button {
+      padding: 10px;
+      background-color: #007BFF;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 10px;
+    }
+    button:disabled { background-color: gray; }
+    input {
+      width: 100%;
+      padding: 8px;
+      margin-top: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    audio {
+      width: 100%;
+      margin-top: 10px;
+      display: none;
+    }
+    .status-message {
+      font-weight: bold;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ENROLLMENT SECTION -->
+  <div class="container">
+    <h1>Enroll User</h1>
+    <input type="text" id="user_id" placeholder="Enter User ID">
+    <p id="status-enroll">Click "Start Recording" to enroll.</p>
+    <button id="start-record-enroll">Start Recording</button>
+    <button id="stop-record-enroll" disabled>Stop Recording</button>
+    <audio id="audio-playback-enroll" controls></audio>
+    <button id="enroll-btn" disabled>Enroll</button>
+    <p id="enroll-status" class="status-message"></p>
+  </div>
+
+  <!-- AUTHENTICATION SECTION -->
+  <div class="container" style="margin-top: 30px;">
+    <h1>Authenticate User</h1>
+    <input type="text" id="auth_user_id" placeholder="Enter User ID">
+    <p id="status-auth">Click "Start Recording" to authenticate.</p>
+    <button id="start-record-auth">Start Recording</button>
+    <button id="stop-record-auth" disabled>Stop Recording</button>
+    <audio id="audio-playback-auth" controls></audio>
+    <button id="auth-btn" disabled>Authenticate</button>
+    <p id="auth-status" class="status-message"></p>
+  </div>
+
+  <script>
+    let enrollRecorder, enrollChunks = [];
+    let authRecorder, authChunks = [];
+    const API_KEY = "my_secure_api_key"; // Replace with your actual API key
+
+    // ---- ENROLLMENT FUNCTIONS ----
+    async function startEnrollmentRecording() {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      enrollRecorder = new MediaRecorder(stream);
+      enrollChunks = [];
+
+      enrollRecorder.ondataavailable = event => enrollChunks.push(event.data);
+      enrollRecorder.onstop = () => {
+        const audioBlob = new Blob(enrollChunks, { type: "audio/wav" });
+        document.getElementById("audio-playback-enroll").src = URL.createObjectURL(audioBlob);
+        document.getElementById("audio-playback-enroll").style.display = "block";
+        document.getElementById("enroll-btn").disabled = false;
+      };
+
+      enrollRecorder.start();
+      document.getElementById("start-record-enroll").disabled = true;
+      document.getElementById("stop-record-enroll").disabled = false;
+      document.getElementById("status-enroll").innerText = "Recording...";
+    }
+
+    function stopEnrollmentRecording() {
+      if (enrollRecorder.state === "recording") {
+        enrollRecorder.stop();
+        document.getElementById("start-record-enroll").disabled = false;
+        document.getElementById("stop-record-enroll").disabled = true;
+        document.getElementById("status-enroll").innerText = "Recording stopped.";
+      }
+    }
+
+    async function enrollUser() {
+      const userId = document.getElementById("user_id").value.trim();
+      if (!userId) {
+        alert("Please enter a User ID!");
+        return;
+      }
+
+      const audioBlob = new Blob(enrollChunks, { type: "audio/wav" });
+      const formData = new FormData();
+      formData.append("user_id", userId);
+      formData.append("audio", audioBlob, `${userId}.wav`);
+
+      const response = await fetch("http://127.0.0.1:8000/enroll", {
+        method: "POST",
+        headers: {
+          "x-api-key": API_KEY
+        },
+        body: formData,
+      });
+
+      const result = await response.json();
+      document.getElementById("enroll-status").innerText = result.message;
+      document.getElementById("enroll-status").style.color = result.success ? "green" : "red";
+      alert(result.message);
+    }
+
+    // ---- AUTHENTICATION FUNCTIONS ----
+    async function startAuthRecording() {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      authRecorder = new MediaRecorder(stream);
+      authChunks = [];
+
+      authRecorder.ondataavailable = event => authChunks.push(event.data);
+      authRecorder.onstop = () => {
+        const audioBlob = new Blob(authChunks, { type: "audio/wav" });
+        document.getElementById("audio-playback-auth").src = URL.createObjectURL(audioBlob);
+        document.getElementById("audio-playback-auth").style.display = "block";
+        document.getElementById("auth-btn").disabled = false;
+      };
+
+      authRecorder.start();
+      document.getElementById("start-record-auth").disabled = true;
+      document.getElementById("stop-record-auth").disabled = false;
+      document.getElementById("status-auth").innerText = "Recording...";
+    }
+
+    function stopAuthRecording() {
+      if (authRecorder.state === "recording") {
+        authRecorder.stop();
+        document.getElementById("start-record-auth").disabled = false;
+        document.getElementById("stop-record-auth").disabled = true;
+        document.getElementById("status-auth").innerText = "Recording stopped.";
+      }
+    }
+
+    async function authenticateUser() {
+      const userId = document.getElementById("auth_user_id").value.trim();
+      if (!userId) {
+        alert("Please enter a User ID!");
+        return;
+      }
+
+      const audioBlob = new Blob(authChunks, { type: "audio/wav" });
+      const formData = new FormData();
+      formData.append("user_id", userId);
+      formData.append("audio", audioBlob, `${userId}.wav`);
+
+      try {
+        const response = await fetch("http://127.0.0.1:8000/authenticate", {
+          method: "POST",
+          headers: {
+            "x-api-key": API_KEY
+          },
+          body: formData,
+        });
+
+        const result = await response.json();
+        document.getElementById("auth-status").innerText = result.message;
+        document.getElementById("auth-status").style.color = result.success ? "green" : "red";
+      } catch (error) {
+        document.getElementById("auth-status").innerText = "Error occurred during authentication!";
+        document.getElementById("auth-status").style.color = "red";
+      }
+    }
+
+    // ---- EVENT LISTENERS ----
+    document.getElementById("start-record-enroll").addEventListener("click", startEnrollmentRecording);
+    document.getElementById("stop-record-enroll").addEventListener("click", stopEnrollmentRecording);
+    document.getElementById("enroll-btn").addEventListener("click", enrollUser);
+
+    document.getElementById("start-record-auth").addEventListener("click", startAuthRecording);
+    document.getElementById("stop-record-auth").addEventListener("click", stopAuthRecording);
+    document.getElementById("auth-btn").addEventListener("click", authenticateUser);
+  </script>
+
+</body>
+</html>
